@@ -61,10 +61,45 @@ const TodoTemplate = () => {
     });
   };
 
+  // 할 일 삭제 처리 함수
+  const removeTodo = (id) => {
+    // const removedTodos = todos.filter(
+    //   (todo) => todo.id !== id,
+    // );
+    setTodos(todos.filter((todo) => todo.id !== id));
+  };
+
+  // 할 일 체크 처리 함수
+  const checkTodo = (id) => {
+    // const copyTodos = [...todos];
+    // for (let cTodo of copyTodos) {
+    //   if (cTodo.id === id) {
+    //     cTodo.done = !cTodo.done;
+    //   }
+    // }
+
+    // setTodos(copyTodos);
+    setTodos(
+      todos.map((todo) =>
+        todo.id === id
+          ? { ...todo, done: !todo.done }
+          : todo,
+      ),
+    );
+  };
+
+  // 체크가 안 된 할 일의 개수를 카운트 하기
+  const countRestTodo = () =>
+    todos.filter((todo) => !todo.done).length;
+
   return (
     <div className='TodoTemplate'>
-      <TodoHeader />
-      <TodoMain todoList={todos} />
+      <TodoHeader count={countRestTodo} />
+      <TodoMain
+        todoList={todos}
+        remove={removeTodo}
+        check={checkTodo}
+      />
       <TodoInput addTodo={addTodo} />
     </div>
   );
