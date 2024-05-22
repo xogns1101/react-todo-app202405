@@ -6,70 +6,67 @@ import {
   TextField,
   Typography,
 } from '@mui/material';
-import React, { useState } from 'react';
+import React, { useCallback, useReducer } from 'react';
 import {
   API_BASE_URL,
   USER,
 } from '../../config/host-config';
+import { initialState, joinReducer } from './joinReducer';
+import { debounce } from 'lodash';
+import { useNavigate } from 'react-router-dom';
 
 const Join = () => {
-  // 상태 변수로 회원가입 입력값 관리
-  const [userValue, setUserValue] = useState({
-    userName: '',
-    password: '',
-    email: '',
-  });
+  // 리다이렉트 효과 사용하기
+  const navigate = useNavigate();
 
-  // 검증 메세지에 대한 상태변수 관리
-  // 입력값과 메세지는 따로 상태 관리(메세지는 백엔드로 보내줄 필요 없음)
-  // 메세지 영역은 각 입력창마다 존재(이름, 이메일, 비밀번호...)하기 때문에 객체 형태로 한 번에 관리
-  const [message, setMessage] = useState({
-    userName: '',
-    password: '',
-    passwordCheck: '',
-    email: '',
-  });
+  // useReducer를 사용해서 리듀서 함수 등록, state와 dispatch를 전달받음.
+  const [state, dispatch] = useReducer(
+    joinReducer,
+    initialState,
+  );
 
-  // 검증 완료 체크에 대한 상태변수 관리
-  // 각각의 입력창마다 유효성 검증 상태를 관리해야 하기 때문에 객체로 선언.
-  // 상태를 유지하려는 이유 -> 스타일, 마지막에 회원가입 버튼 누를 때 까지 검증 상태를 유지해야 하기 때문
-  const [correct, setCorrect] = useState({
-    userName: false,
-    password: false,
-    passwordCheck: false,
-    email: false,
-  });
+  // 상태 객체에서 각각의 상태 객체값을 분해 할당.
+  const { userValue, message, correct } = state;
 
-  // 검증된 데이터를 각각의 상태 변수에 저장해 주는 함수
-  const saveInputState = ({
-    key,
-    inputValue,
-    flag,
-    msg,
-  }) => {
-    // 입력값 세팅
-    // 패스워드 확인 입력값은 굳이 userValue 상태로 유지할 필요가 없기 때문에
-    // 임의의 문자열 'pass'를 넘기고 있습니다. -> pass가 넘어온다면 setUserValue()를 실행하지 않겠다.
-    inputValue !== 'pass' &&
-      setUserValue((oldVal) => {
-        return { ...oldVal, [key]: inputValue };
+  // 각각의 핸들러에서 호출하는 dispatch 처리를 중앙화 하자.
+  const updateState = (key, inputValue, msg, flag) => {
+    key !== 'passwordCheck' &&
+      dispatch({
+        type: 'SET_USER_VALUE',
+        key,
+        value: inputValue,
       });
-
-    // 메세지 세팅
-    setMessage((oldMsg) => {
-      return { ...oldMsg, [key]: msg }; // key 변수의 값을 프로퍼티 키로 활용하는 중
+    dispatch({
+      type: 'SET_MESSAGE',
+      key,
+      value: msg,
     });
-
-    // 입력값 검증 상태 세팅
-    setCorrect((oldCorrect) => {
-      return { ...oldCorrect, [key]: flag };
+    dispatch({
+      type: 'SET_CORRECT',
+      key,
+      value: flag,
     });
   };
 
+  // 각각의 핸들러에 붙어 있는 디바운스 함수를 일괄적 처리
+  // useCallback: 함수의 메모이제이션을 위한 훅. (함수의 선언을 기억했다가 재사용하기 위한 훅)
+  // 상태값 변경에 의해 화면의 재 렌더링이 발생할 때, 컴포넌트의 함수들도 재 선언이 됩니다.
+  // useCallback으로 함수를 감싸 주시면 이전에 생성된 함수를 기억했다가 재 사용하도록 하기 때문에
+  // 불필요한 함수 선언을 방지할 수 있습니다. (성능 최적화에 도움이 됩니다.)
+  const debouncedUpdateState = useCallback(
+    debounce((key, inputValue, msg, flag) => {
+      console.log('debounce called! key: ', key);
+      updateState(key, inputValue, msg, flag);
+    }, 500),
+    [],
+  ); // 의존성 배열을 비워놓으면, 첫 렌더링 때 함수가 선언되고 다시는 재선언되지 않습니다.
+  // 만약 함수의 선언이 특정 상태가 변할 때 재선언 되어야 한다면, 의존성 배열에 상태 변수를 선언하시면 됩니다.
+
   // 이름 입력창 체인지 이벤트 핸들러
   const nameHandler = (e) => {
-    const nameRegex = /^[가-힣]{2,5}$/;
+    console.log('nameHandler가 동작함!');
     const inputValue = e.target.value;
+    const nameRegex = /^[가-힣]{2,5}$/;
 
     // 입력값 검증
     let msg; // 검증 메세지를 저장할 변수
@@ -84,13 +81,7 @@ const Join = () => {
       flag = true;
     }
 
-    // saveInputState에게 이 핸들러에서 처리한 여러가지 값을 객체로 한 번에 넘기기
-    saveInputState({
-      key: 'userName',
-      inputValue,
-      msg,
-      flag,
-    });
+    debouncedUpdateState('userName', inputValue, msg, flag);
   };
 
   // 이메일 중복 체크 서버 통신 함수
@@ -101,21 +92,14 @@ const Join = () => {
     fetch(`${API_BASE_URL}${USER}/check?email=${email}`)
       .then((res) => res.json())
       .then((result) => {
-        console.log('result: ');
+        console.log('result: ', result);
         if (result) {
           msg = '이메일이 중복되었습니다.';
         } else {
           msg = '사용 가능한 이메일 입니다.';
           flag = true;
         }
-
-        // 중복 확인 후 상태값 변경
-        saveInputState({
-          key: 'email',
-          inputValue: email,
-          msg,
-          flag,
-        });
+        debouncedUpdateState('email', email, msg, flag);
       });
   };
 
@@ -135,27 +119,19 @@ const Join = () => {
     } else {
       // 이메일 중복 체크
       fetchDuplicateCheck(inputValue);
+      return;
     }
 
-    // 중복 확인 후에만 상태변경 하는 것이 아닙니다!
-    // 입력창이 비거나, 정규표현식 위반인 경우에도 상태는 변경 되어야 합니다
-    saveInputState({
-      key: 'email',
-      inputValue,
-      msg,
-      flag,
-    });
+    debouncedUpdateState('email', inputValue, msg, flag);
   };
 
   // 패스워드 입력창 체인지 이벤트 핸들러
   const passwordHandler = (e) => {
+    const inputValue = e.target.value;
     // 패스워드가 변경됐다? -> 패스워드 확인란도 초기화 시킨다.
     document.getElementById('password-check').value = '';
+    updateState('passwordCheck', '', '', false);
 
-    setMessage({ ...message, passwordCheck: '' });
-    setCorrect({ ...correct, passwordCheck: false });
-
-    const inputValue = e.target.value;
     const pwRegex =
       /^(?=.*[A-Za-z])(?=.*\d)(?=.*[$@$!%*#?&])[A-Za-z\d$@$!%*#?&]{8,20}$/;
 
@@ -172,33 +148,29 @@ const Join = () => {
       flag = true;
     }
 
-    saveInputState({
-      key: 'password',
-      inputValue,
-      msg,
-      flag,
-    });
+    debouncedUpdateState('password', inputValue, msg, flag);
   };
 
   // 비밀번호 확인란 체인지 이벤트 핸들러
   const pwCheckHandler = (e) => {
+    const inputValue = e.target.value;
     let msg;
     let flag = false;
-    if (!e.target.value) {
+    if (!inputValue) {
       msg = '비밀번호 확인란은 필수입니다.';
-    } else if (userValue.password !== e.target.value) {
+    } else if (userValue.password !== inputValue) {
       msg = '비밀번호가 일치하지 않습니다.';
     } else {
       msg = '비밀번호가 일치합니다.';
       flag = true;
     }
 
-    saveInputState({
-      key: 'passwordCheck',
-      inputValue: 'pass',
+    debouncedUpdateState(
+      'passwordCheck',
+      'pass',
       msg,
       flag,
-    });
+    );
   };
 
   // 4개의 입력창이 모두 검증에 통과했는지 여부를 검사
@@ -211,7 +183,7 @@ const Join = () => {
   };
 
   // 회원 가입 처리 서버 요청
-  const fetchSignupPost = () => {
+  const fetchSignUpPost = () => {
     fetch(`${API_BASE_URL}${USER}`, {
       method: 'POST',
       headers: { 'content-type': 'application/json' },
@@ -220,13 +192,16 @@ const Join = () => {
       .then((res) => res.json())
       .then((data) => {
         alert(
-          `${data.userName}님(${data.email})님 회원가입에 성공했습니다.`,
+          `${data.userName}(${data.email})님 회원가입에 성공했습니다.`,
         );
+        // 로그인 페이지로 리다이렉트
+        // window.location.href = '/login';
+        navigate('/login');
       })
       .catch((err) => {
         console.log('err: ', err);
         alert(
-          '서버와의 통신이 원활 하지 않습니다. 관리자에게 문의하세요',
+          '서버와의 통신이 원활하지 않습니다. 관리자에게 문의하세요.',
         );
       });
   };
@@ -236,8 +211,8 @@ const Join = () => {
     e.preventDefault();
 
     if (isValid()) {
-      // fetch를 사용한 회원 가입 요청
-      fetchSignupPost();
+      // fetch를 사용한 회원 가입 요청.
+      fetchSignUpPost();
     } else {
       alert('입력란을 다시 확인해 주세요!');
     }
