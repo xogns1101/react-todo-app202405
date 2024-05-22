@@ -31,7 +31,7 @@ const TodoHeader = ({ count, promote }) => {
     if (role === 'COMMON') {
       return (
         <span
-          className='promote bage bg-warning'
+          className='promote badge bg-warning'
           onClick={upgrade}
         >
           일반회원
@@ -39,13 +39,15 @@ const TodoHeader = ({ count, promote }) => {
       );
     } else if (role === 'PREMIUM') {
       return (
-        <span className='promote bage bg-danger'>
+        <span className='promote badge bg-danger'>
           프리미엄
         </span>
       );
     } else if (role === 'ADMIN') {
       return (
-        <span className='promote bage bg-info'>관리자</span>
+        <span className='promote badge bg-info'>
+          관리자
+        </span>
       );
     }
   };
