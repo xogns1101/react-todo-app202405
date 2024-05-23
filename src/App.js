@@ -24,7 +24,7 @@ function App() {
             <Route path='/join' element={<Join />} />
             <Route
               path='/oauth/kakao'
-              element={KaKaoLoginHandler}
+              element={<KaKaoLoginHandler />}
             />
           </Routes>
         </div>
