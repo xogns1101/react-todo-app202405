@@ -5,6 +5,7 @@ import cn from 'classnames';
 
 const TodoItem = ({ item, remove, check }) => {
   const { id, title, done } = item;
+
   return (
     <li className='todo-list-item'>
       <div
